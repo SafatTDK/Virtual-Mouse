@@ -1,0 +1,63 @@
+import time
+import board
+import busio
+import usb_hid
+import digitalio
+from adafruit_mpu6050 import MPU6050
+from adafruit_hid.mouse import Mouse
+
+# Setup I2C and MPU6050
+i2c = busio.I2C(scl=board.GP15, sda=board.GP14)
+mpu = MPU6050(i2c)
+mouse = Mouse(usb_hid.devices)
+
+# Setup Push Buttons
+left_button = digitalio.DigitalInOut(board.GP16)
+left_button.direction = digitalio.Direction.INPUT
+left_button.pull = digitalio.Pull.UP
+
+right_button = digitalio.DigitalInOut(board.GP17)
+right_button.direction = digitalio.Direction.INPUT
+right_button.pull = digitalio.Pull.UP
+
+# Setup Mouse Enable Button
+enable_button = digitalio.DigitalInOut(board.GP18)
+enable_button.direction = digitalio.Direction.INPUT
+enable_button.pull = digitalio.Pull.UP
+
+# Variables to track previous button state
+prev_left_pressed = False
+prev_right_pressed = False
+
+while True:
+    # Read Buttons
+    left_pressed = not left_button.value  # Button pressed if LOW
+    right_pressed = not right_button.value
+    mouse_enabled = enable_button.value  # Mouse enabled if button NOT pressed
+
+    # Move mouse ONLY if enabled
+    if mouse_enabled:
+        gx, gy, gz = mpu.gyro
+        dx = int(-gz * 10)
+        dy = int(-gx * 10)
+
+        if abs(dx) > 1 or abs(dy) > 1:
+            mouse.move(dx, dy)
+
+    # LEFT Button handling for click and drag
+    if left_pressed and not prev_left_pressed:
+        mouse.press(Mouse.LEFT_BUTTON)
+    elif not left_pressed and prev_left_pressed:
+        mouse.release(Mouse.LEFT_BUTTON)
+
+    # RIGHT Button handling for click and drag
+    if right_pressed and not prev_right_pressed:
+        mouse.press(Mouse.RIGHT_BUTTON)
+    elif not right_pressed and prev_right_pressed:
+        mouse.release(Mouse.RIGHT_BUTTON)
+
+    # Update previous button states
+    prev_left_pressed = left_pressed
+    prev_right_pressed = right_pressed
+
+    time.sleep(0.01)
